@@ -36,6 +36,15 @@ h2,.reading-group>h3{font-size:14px}
 #scopeClose{width:44px;height:44px;background:transparent;font-size:18px;color:#53627a}
 #scopeChoices label{display:flex;align-items:center;gap:9px;min-height:44px;padding:0 14px;font-size:12px;line-height:1.4;cursor:pointer}
 #scopeChoices input{margin:0;accent-color:#3666e9}
+
+.knowledge-table{width:100%;table-layout:fixed;border-collapse:collapse;margin:12px 0 3px;font-size:12px;line-height:1.55}
+.knowledge-table caption{padding:8px 6px;text-align:center;font-size:14px;font-weight:700;color:#203451;background:#edf3ff;border:1px solid #dce4ef;border-bottom:0}
+.knowledge-table th,.knowledge-table td{padding:7px 6px;border:1px solid #dce4ef;vertical-align:top;text-align:left;overflow-wrap:anywhere}
+.knowledge-table th{font-weight:600;background:#f6f8fc}
+.knowledge-table td{white-space:pre-wrap}
+.knowledge-table thead th{background:#edf3ff}
+.table-source{display:block;margin:0 0 18px}
+.table-notes p{font-size:13px;line-height:1.5;white-space:pre-wrap;margin:8px 0}
 </style></head><body><header><h1>📖 门店培训 · 挖空记忆</h1><small>两份 PDF · 16 个学习范围 · 每轮只挖一空 · 间隔复习</small></header><main><section class="panel"><div class="row"><strong>选择学习范围</strong><span class="pill">V1 · 可离线使用</span></div><select id="module" aria-label="选择学习范围"><option value="ALL">全部模块 · 混合练习</option>
 <option value="公司企业文化">公司企业文化</option>
 <option value="公司大愿望">公司大愿望</option>
@@ -138,6 +147,70 @@ function next(){if(selected==='商品库位名称'||(selected==='ALL'&&session%5
   const note=group.find(x=>x.id===14);
   return `<table class="expiry-table"><thead><tr><th>商品类型</th><th>保质期区间</th><th>提前下架</th></tr></thead><tbody>${rows}</tbody></table>${note?`<div class="expiry-note">${esc(note.text)}</div>`:''}<small>商品效期 · PDF第1页</small>`;
 }
+function readingTable(caption, rows, pages, columns){
+  const header = columns ? `<thead><tr><th scope="col">${esc(columns[0])}</th><th scope="col">${esc(columns[1])}</th></tr></thead>` : '';
+  const body = rows.map(([label, text]) => `<tr><th scope="row">${esc(label)}</th><td>${lines(text)}</td></tr>`).join('');
+  return `<table class="knowledge-table"><caption>${esc(caption)}</caption><colgroup><col style="width:24%"><col></colgroup>${header}<tbody>${body}</tbody></table><small class="table-source">PDF 第 ${pages.join('、')} 页</small>`;
+}
+function classificationTables(group){
+  const sections = [
+    ['（一）常温定量商品', [24]],
+    ['酒水乳饮', [25]],
+    ['（二）散称商品', [26, 27]],
+    ['（三）冷冻冷藏', [28]],
+    ['（四）非休闲商品', [29]]
+  ];
+  let content = sections.map(([title, ids]) => {
+    const rows = [];
+    const pages = new Set();
+    for (const card of group.filter(c => ids.includes(c.id))){
+      pages.add(card.page);
+      for (const line of card.text.split('\n')){
+        const separator = line.indexOf('：');
+        if (separator < 0) continue;
+        rows.push([line.slice(0, separator), line.slice(separator + 1)]);
+      }
+    }
+    return readingTable(title, rows, [...pages], ['分类', '商品明细']);
+  }).join('');
+  const placement = group.filter(c => c.id >= 30 && c.id <= 33);
+  content += `<div class="table-notes">${placement.map(c => `<p>${lines(c.text)}</p>`).join('')}<small>PDF 第 2 页</small></div>`;
+  return content;
+}
+function equipmentTables(group){
+  const devices = new Map();
+  const fields = new Set(['制作配比', '售卖时长', '清洗周期', '陈列商品', '操作设备', '制作流程', '陈列规范', '储存时长', '储放时长', '微波炉加热时长']);
+  for (const card of group){
+    const [heading, ...body] = card.text.split('\n');
+    const name = heading.split('（')[0];
+    if (!devices.has(name)) devices.set(name, {title:heading, rows:new Map(), pages:new Set()});
+    const device = devices.get(name);
+    if (heading.includes('（')) device.title = heading;
+    device.pages.add(card.page);
+    let field = '';
+    for (const line of body){
+      const separator = line.indexOf('：');
+      const label = separator < 0 ? '' : line.slice(0, separator);
+      let value = line;
+      if (fields.has(label)){
+        field = label;
+        value = line.slice(separator + 1);
+      } else if (label === '清洗步骤'){
+        field = '清洗周期';
+      } else if (label === '单盘烤制'){
+        field = '制作流程';
+      }
+      if (!field) continue;
+      if (!device.rows.has(field)) device.rows.set(field, []);
+      if (value) device.rows.get(field).push(value);
+    }
+  }
+  return [...devices.values()].map(device => readingTable(
+    device.title,
+    [...device.rows].map(([label, parts]) => [label, parts.join('\n')]),
+    [...device.pages]
+  )).join('');
+}
 function renderLearn(){
   const groups = new Map();
   for (const card of filtered()){
@@ -148,7 +221,7 @@ function renderLearn(){
   list.textContent = '';
   $('learnCount').textContent = selected === 'ALL' ? `共 ${groups.size} 个学习范围`
     : selected === '商品库位名称' ? `共 ${LOCATION_CARDS.length} 种库位`
-    : groups.get(selected).length === 1 || ['商品效期', '品牌发展重要阶段'].includes(selected) ? '' : `共 ${groups.get(selected).length} 条知识点`;
+    : groups.get(selected).length === 1 || ['商品效期', '品牌发展重要阶段', '商品分类', '鲜食区设备（效期、制作、清洗周期）'].includes(selected) ? '' : `共 ${groups.get(selected).length} 条知识点`;
   for (const [name, group] of groups){
     const section = document.createElement('section');
     section.className = 'reading-group';
@@ -162,6 +235,10 @@ function renderLearn(){
       content = '<img class="brand-timeline-img" alt="品牌发展重要阶段时间轴：五个重要日期及对应事件" src="'+TIMELINE_IMAGE+'"><small>品牌发展重要阶段 · PDF第1页</small>';
     } else if (name === '商品效期'){
       content = expiryTable(group);
+    } else if (name === '商品分类'){
+      content = classificationTables(group);
+    } else if (name === '鲜食区设备（效期、制作、清洗周期）'){
+      content = equipmentTables(group);
     } else {
       content = group.map(c => {
         const titleText = c.title.replace(/\s+/g, '').replace(/…$/, '');
