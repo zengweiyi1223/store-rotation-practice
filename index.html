@@ -148,7 +148,7 @@ function renderLearn(){
   list.textContent = '';
   $('learnCount').textContent = selected === 'ALL' ? `共 ${groups.size} 个学习范围`
     : selected === '商品库位名称' ? `共 ${LOCATION_CARDS.length} 种库位`
-    : ['商品效期', '品牌发展重要阶段'].includes(selected) ? '' : `共 ${groups.get(selected).length} 条知识点`;
+    : ['公司企业文化', '商品效期', '品牌发展重要阶段'].includes(selected) ? '' : `共 ${groups.get(selected).length} 条知识点`;
   for (const [name, group] of groups){
     const section = document.createElement('section');
     section.className = 'reading-group';
@@ -164,7 +164,7 @@ function renderLearn(){
       content = expiryTable(group);
     } else {
       content = group.map(c => {
-        const title = c.title === name ? '' : `<h4>${esc(c.title)}</h4>`;
+        const title = name === '公司企业文化' || c.title === name ? '' : `<h4>${esc(c.title)}</h4>`;
         const text = name === '品牌简介' ? brandHighlights(c) : lines(c.text);
         return `<article class="reading-point">${title}<p>${text}</p><small>PDF 第 ${c.page} 页</small></article>`;
       }).join('');
