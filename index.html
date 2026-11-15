@@ -47,6 +47,7 @@ h2,.reading-group>h3{font-size:14px}
 .table-notes p{font-size:13px;line-height:1.5;white-space:pre-wrap;margin:8px 0}
 .note,.reading-group small{overflow-wrap:anywhere}
 .bottom.hidden{display:none}.mistake-filters{display:flex;gap:5px;flex-wrap:wrap;margin:10px 0}.mistake-filters button{font-size:12px;padding:8px}.mistake-filters .on{background:#e8efff;color:#2458d7}.mistake-item{border-top:1px solid #e4e9f1;padding:12px 0;font-size:13px}.mistake-item p{white-space:pre-wrap;line-height:1.5;margin:6px 0}.mistake-item small{display:block;font-size:10px;color:#728098}.mistake-item button{font-size:12px;padding:7px 10px;margin-top:7px}.review-choice{font-size:12px;line-height:1.6}#reviewControls{font-size:12px;margin-bottom:8px}#reviewControls button{font-size:11px;padding:7px}
+.reading-group>.table-source{margin:10px 0 0}
 </style></head><body><header><h1>📖 门店培训 · 挖空记忆</h1><small>两份 PDF · 16 个学习范围 · 每轮只挖一空 · 间隔复习</small></header><main><section class="panel"><div class="row"><strong>选择学习范围</strong><span class="pill">V1 · 可离线使用</span></div><select id="module" aria-label="选择学习范围"><option value="ALL">全部模块 · 混合练习</option>
 <option value="公司企业文化">公司企业文化</option>
 <option value="公司大愿望">公司大愿望</option>
@@ -318,31 +319,28 @@ function expiryTable(group){
   const note=group.find(x=>x.id===14);
   return `<table class="expiry-table"><thead><tr><th>商品类型</th><th>保质期区间</th><th>提前下架</th></tr></thead><tbody>${rows}</tbody></table>${note?`<div class="expiry-note">${esc(note.text)}</div>`:''}<small>${sourceText(PDF_SOURCES.required,[1])}</small>`;
 }
-function readingTable(caption, rows, pages, columns){
+function readingTable(caption, rows, columns){
   const header = columns ? `<thead><tr><th scope="col">${esc(columns[0])}</th><th scope="col">${esc(columns[1])}</th></tr></thead>` : '';
   const body = rows.map(([label, text]) => `<tr><th scope="row">${esc(label)}</th><td>${lines(text)}</td></tr>`).join('');
-  return `<table class="knowledge-table"><caption>${esc(caption)}</caption><colgroup><col style="width:24%"><col></colgroup>${header}<tbody>${body}</tbody></table><small class="table-source">${sourceText(PDF_SOURCES.learning,pages)}</small>`;
+  return `<table class="knowledge-table"><caption>${esc(caption)}</caption><colgroup><col style="width:24%"><col></colgroup>${header}<tbody>${body}</tbody></table>`;
 }
 function classificationTables(group){
   const sections = [
-    ['（一）常温定量商品', [24]],
-    ['酒水乳饮', [25]],
+    ['（一）常温定量商品', [24, 25]],
     ['（二）散称商品', [26, 27]],
     ['（三）冷冻冷藏', [28]],
     ['（四）非休闲商品', [29]]
   ];
   const content = sections.map(([title, ids]) => {
     const rows = [];
-    const pages = new Set();
     for (const card of group.filter(c => ids.includes(c.id))){
-      pages.add(card.page);
       for (const line of card.text.split('\n')){
         const separator = line.indexOf('：');
         if (separator < 0) continue;
         rows.push([line.slice(0, separator), line.slice(separator + 1)]);
       }
     }
-    return readingTable(title, rows, [...pages], ['分类', '商品明细']);
+    return readingTable(title, rows, ['分类', '商品明细']);
   }).join('');
   return content;
 }
@@ -352,10 +350,9 @@ function equipmentTables(group){
   for (const card of group){
     const [heading, ...body] = card.text.split('\n');
     const name = heading.split('（')[0];
-    if (!devices.has(name)) devices.set(name, {title:heading, rows:new Map(), pages:new Set()});
+    if (!devices.has(name)) devices.set(name, {title:heading, rows:new Map()});
     const device = devices.get(name);
     if (heading.includes('（')) device.title = heading;
-    device.pages.add(card.page);
     let field = '';
     for (const line of body){
       const separator = line.indexOf('：');
@@ -376,8 +373,7 @@ function equipmentTables(group){
   }
   return [...devices.values()].map(device => readingTable(
     device.title,
-    [...device.rows].map(([label, parts]) => [label, parts.join('\n')]),
-    [...device.pages]
+    [...device.rows].map(([label, parts]) => [label, parts.join('\n')])
   )).join('');
 }
 function renderLearn(){
@@ -397,6 +393,7 @@ function renderLearn(){
     const heading = document.createElement('h3');
     heading.textContent = name;
     section.appendChild(heading);
+    const consolidatedSource = ['商品分类', '商品陈列六步法', '鲜食区设备（效期、制作、清洗周期）', '会员', '零食有鸣 APP 的使用手册'].includes(name);
     let content;
     if (name === '商品库位名称'){
       content = '<p class="location-tip">13种库位均配有识别示意图，点击图片可放大；请结合位置、结构和陈列商品辨认。</p>'+LOCATION_CARDS.map((x,i)=>`<article class="location-card"><h4>${i+1}. ${esc(x.name)}</h4>${x.image ? `<img src="${x.image}" alt="${esc(x.name)}示意图" loading="lazy" class="location-photo" onclick="openLocationImage(${i},this)">` : ''}<div class="location-info"><p><b>结构：</b>${esc(x.structure)}</p><p><b>识别重点：</b>${esc(x.feature)}</p></div></article>`).join('')+'<small>'+sourceText(PDF_SOURCES.learning,[1])+'。结构解释为辅助理解。</small>';
@@ -415,10 +412,17 @@ function renderLearn(){
         const repeatsBody = bodyText === titleText || (c.title.endsWith('…') && bodyText.startsWith(titleText));
         const title = group.length === 1 || c.title === name || repeatsBody ? '' : `<h4>${esc(c.title)}</h4>`;
         const text = name === '品牌简介' ? brandHighlights(c) : lines(c.text);
-        return `<article class="reading-point">${title}<p>${text}</p><small>${sourceText(c.id<=16?PDF_SOURCES.required:PDF_SOURCES.learning,[c.page])}</small></article>`;
+        const source = consolidatedSource ? '' : `<small>${sourceText(c.id<=16?PDF_SOURCES.required:PDF_SOURCES.learning,[c.page])}</small>`;
+        return `<article class="reading-point">${title}<p>${text}</p>${source}</article>`;
       }).join('');
     }
     section.insertAdjacentHTML('beforeend', content);
+    if (consolidatedSource){
+      const source = document.createElement('small');
+      source.className = 'table-source';
+      source.textContent = sourceText(PDF_SOURCES.learning, group.map(card => card.page));
+      section.appendChild(source);
+    }
     list.appendChild(section);
   }
 }
