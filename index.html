@@ -48,6 +48,8 @@ h2,.reading-group>h3{font-size:14px}
 .note,.reading-group small{overflow-wrap:anywhere}
 .bottom.hidden{display:none}.mistake-filters{display:flex;gap:5px;flex-wrap:wrap;margin:10px 0}.mistake-filters button{font-size:12px;padding:8px}.mistake-filters .on{background:#e8efff;color:#2458d7}.mistake-item{border-top:1px solid #e4e9f1;padding:12px 0;font-size:13px}.mistake-item p{white-space:pre-wrap;line-height:1.5;margin:6px 0}.mistake-item small{display:block;font-size:10px;color:#728098}.mistake-item button{font-size:12px;padding:7px 10px;margin-top:7px}.review-choice{font-size:12px;line-height:1.6}#reviewControls{font-size:12px;margin-bottom:8px}#reviewControls button{font-size:11px;padding:7px}
 .reading-group>.table-source{margin:10px 0 0}
+.knowledge-table th.shared-category{background:#fff1f2;color:#9f1239}
+.comparison-note{font-size:12px;line-height:1.5;color:#64748b;margin:0 0 8px}
 </style></head><body><header><h1>📖 门店培训 · 挖空记忆</h1><small>两份 PDF · 16 个学习范围 · 每轮只挖一空 · 间隔复习</small></header><main><section class="panel"><div class="row"><strong>选择学习范围</strong><span class="pill">V1 · 可离线使用</span></div><select id="module" aria-label="选择学习范围"><option value="ALL">全部模块 · 混合练习</option>
 <option value="公司企业文化">公司企业文化</option>
 <option value="公司大愿望">公司大愿望</option>
@@ -319,9 +321,9 @@ function expiryTable(group){
   const note=group.find(x=>x.id===14);
   return `<table class="expiry-table"><thead><tr><th>商品类型</th><th>保质期区间</th><th>提前下架</th></tr></thead><tbody>${rows}</tbody></table>${note?`<div class="expiry-note">${esc(note.text)}</div>`:''}<small>${sourceText(PDF_SOURCES.required,[1])}</small>`;
 }
-function readingTable(caption, rows, columns){
+function readingTable(caption, rows, columns, highlightedLabels=[]){
   const header = columns ? `<thead><tr><th scope="col">${esc(columns[0])}</th><th scope="col">${esc(columns[1])}</th></tr></thead>` : '';
-  const body = rows.map(([label, text]) => `<tr><th scope="row">${esc(label)}</th><td>${lines(text)}</td></tr>`).join('');
+  const body = rows.map(([label, text]) => `<tr><th scope="row"${highlightedLabels.includes(label) ? ' class="shared-category"' : ''}>${esc(label)}</th><td>${lines(text)}</td></tr>`).join('');
   return `<table class="knowledge-table"><caption>${esc(caption)}</caption><colgroup><col style="width:24%"><col></colgroup>${header}<tbody>${body}</tbody></table>`;
 }
 function classificationTables(group){
@@ -340,9 +342,18 @@ function classificationTables(group){
         rows.push([line.slice(0, separator), line.slice(separator + 1)]);
       }
     }
-    return readingTable(title, rows, ['分类', '商品明细']);
+    const commonOrder = ['糖巧', '果冻', '蜜饯果干', '坚果炒货', '冲调', '膨化休闲', '饼干糕点'];
+    const order = ids.includes(24) ? commonOrder
+      : ids.includes(26) ? commonOrder.map(label => label === '冲调' ? '固体冲调' : label) : [];
+    if (order.length){
+      rows.sort((a,b) => {
+        const first = order.indexOf(a[0]), second = order.indexOf(b[0]);
+        return (first < 0 ? order.length : first) - (second < 0 ? order.length : second);
+      });
+    }
+    return readingTable(title, rows, ['分类', '商品明细'], order);
   }).join('');
-  return content;
+  return '<p class="comparison-note">淡红底表示定量与散称中同名或对应的分类。</p>' + content;
 }
 function equipmentTables(group){
   const devices = new Map();
