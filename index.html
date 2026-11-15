@@ -51,6 +51,10 @@ h2,.reading-group>h3{font-size:14px}
 .knowledge-table th.shared-category{background:#fff1f2;color:#9f1239}
 .comparison-note{font-size:12px;line-height:1.5;color:#64748b;margin:0 0 8px}
 .related-row{font-size:12px;line-height:1.55;margin-top:10px}.related-row p{white-space:pre-wrap;margin:5px 0;overflow-wrap:anywhere}
+.display-section+.display-section{margin-top:12px}
+.display-section h4{font-size:13px;font-weight:700;margin:0 0 6px}
+.display-section p{font-size:13px;line-height:1.55;margin:4px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.display-section strong{font-weight:700}
 </style></head><body><header><h1>📖 门店培训 · 挖空记忆</h1><small>两份 PDF · 16 个学习范围 · 每轮只挖一空 · 间隔复习</small></header><main><section class="panel"><div class="row"><strong>选择学习范围</strong><span class="pill">V1 · 可离线使用</span></div><select id="module" aria-label="选择学习范围"><option value="ALL">全部模块 · 混合练习</option>
 <option value="公司企业文化">公司企业文化</option>
 <option value="公司大愿望">公司大愿望</option>
@@ -388,6 +392,37 @@ function equipmentTables(group){
     [...device.rows].map(([label, parts]) => [label, parts.join('\n')])
   )).join('');
 }
+function displayNotes(group){
+  const card = id => group.find(item => item.id === id);
+  const rule = (label, text) => `<p><strong>${esc(label)}：</strong>${lines(text)}</p>`;
+  const withoutNumber = text => text.replace(/^\d+\.\s*/, '');
+  const section = (title, content) => `<div class="display-section"><h4>${esc(title)}</h4>${content}</div>`;
+
+  const golden = card(30).text.split('\n').slice(1);
+  const boundary = golden[0].indexOf('：');
+  let positioning = rule(golden[0].slice(0,boundary), golden[0].slice(boundary+1));
+  positioning += `<p>${lines(golden.slice(1).join('\n'))}</p>`;
+  positioning += rule('优先陈列商品', withoutNumber(card(31).text));
+  positioning += rule('端架', withoutNumber(card(32).text).slice('端架'.length));
+  positioning += rule('地堆', withoutNumber(card(33).text).slice('地堆'.length));
+  const fruit = card(100).text.split('：');
+  positioning += rule(fruit[0], fruit.slice(1).join('：'));
+
+  const steps = card(34).text.split('\n').slice(1).join('\n').split('；');
+  const process = `<p>${steps.map(step => `<span><strong>${esc(step.slice(0,2))}</strong>${esc(step.slice(2))}</span>`).join('；')}</p>`;
+
+  function rules(first, last){
+    return group.filter(item => item.id >= first && item.id <= last).map(item => {
+      const text = item.text.split('\n').slice(-1)[0];
+      const separator = text.indexOf('：');
+      return rule(text.slice(0,separator), text.slice(separator+1));
+    }).join('');
+  }
+  return section('黄金位置与端架地堆', positioning)
+    + section('散称陈列六步法', process)
+    + section('散称陈列口诀', rules(35,42))
+    + section('定量陈列口诀', rules(43,49));
+}
 function renderLearn(){
   const groups = new Map();
   for (const card of filtered().filter(card => !card.quizOnly)){
@@ -415,6 +450,8 @@ function renderLearn(){
       content = expiryTable(group);
     } else if (name === '商品分类'){
       content = classificationTables(group);
+    } else if (name === '商品陈列六步法'){
+      content = displayNotes(group);
     } else if (name === '鲜食区设备（效期、制作、清洗周期）'){
       content = equipmentTables(group);
     } else {
